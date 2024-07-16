@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Sentiment Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+            color: #333;
+        }
+
+        #predictionForm {
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #predictionForm input[type="file"],
+        #predictionForm textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        #predictionForm button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #predictionForm button:hover {
+            background-color: #0056b3;
+        }
+
+        #downloadBtn {
+            display: none;
+            margin-top: 10px;
+            background-color: #28a745;
+        }
+
+        #downloadBtn:hover {
+            background-color: #218838;
+        }
+
+        #predictionResult {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            display: none;
+        }
+
+        #graphContainer {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Text Sentiment Prediction</h1>
+
+    <form id="predictionForm">
+        <input type="file" id="csvFileInput" accept=".csv">
+        <textarea id="textInput" placeholder="Enter text..."></textarea>
+        <button type="button" onclick="predict()">Predict</button>
+        <button id="downloadBtn" style="display:none" onclick="downloadPredictions()">Download Predictions</button>
+    </form>
+
+    <div id="predictionResult"></div>
+    <div id="graphContainer"></div>
+
+    <script>
+        function predict() {
+            // Check if CSV file is present
+            var csvFileInput = document.getElementById("csvFileInput");
+            var textInput = document.getElementById("textInput");
+            var predictionResult = document.getElementById("predictionResult");
+            var graphContainer = document.getElementById("graphContainer");
+
+            if (csvFileInput.files.length > 0) {
+                // Upload CSV file
+                var formData = new FormData();
+                formData.append("file", csvFileInput.files[0]);
+
+                fetch("http://127.0.0.1:5000/predict", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: formData
+                })
+                    .then(response => {
+                        if (response.headers.get('X-Graph-Exists') === 'true') {
+                            console.log("Graph")
+                            var graphData = response.headers.get('X-Graph-Data');
+                            displayGraph(graphData);
+                        }
+
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        console.log("Blob:", blob);
+
+                        document.getElementById("downloadBtn").style.display = "block";
+                        document.getElementById("downloadBtn").onclick = function () {
+                            console.log("Downloading...");
+                            var url = URL.createObjectURL(blob);
+                            console.log("URL:", url);
+
+                            var a = document.createElement("a");
+                            a.href = url;
+                            a.download = "Predictions.csv";
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                        };
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                    });
+
+            } else if (textInput.value.trim() !== "") {
+                // Predict on single sentence
+                fetch("http://127.0.0.1:5000/predict", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ "text": textInput.value.trim() })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data)
+                        predictionResult.innerHTML = "Predicted sentiment: " + data.prediction;
+                    });
+            }
+        }
+
+        function downloadPredictions() {
+            console.log("Download prediction")
+        }
+
+        function displayGraph(graphData) {
+            var graphUrl = "data:image/png;base64," + graphData;
+            var img = document.createElement('img');
+            img.src = graphUrl;
+            graphContainer.appendChild(img);
+        }
+    </script>
+
+</body>
+
+</html>
